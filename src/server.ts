@@ -1,7 +1,6 @@
 import express from "express";
 import { mcpServer, createTransport, getTransport } from "./mcpServer.js";
 import dotenv from "dotenv";
-import { randomUUID } from "crypto";
 
 // Load environment variables
 dotenv.config({ path: ".env.local" });
@@ -56,7 +55,7 @@ app.post("/mcp", async (req, res) => {
     }
 
     try {
-      await transport.handlePostMessage(req.body, res);
+      await transport.handlePostMessage(req, res, req.body);
     } catch (error) {
       console.error("Error handling message:", error);
       if (!res.headersSent) {
@@ -93,38 +92,13 @@ app.post("/mcp", async (req, res) => {
 });
 
 // SSE endpoint - Establishes connection with ChatGPT (legacy HTTP+SSE transport)
-app.get("/mcp", (req, res) => {
-  // Generate unique session ID
-  const sessionId = randomUUID();
+app.get("/mcp", async (req, res) => {
+  console.log(`📡 New SSE connection request`);
 
-  console.log(`📡 New SSE connection request, session: ${sessionId}`);
+  // Create transport for this session - it will handle cleanup via onclose
+  const transport = await createTransport(res);
 
-  // Set SSE headers
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Session-Id": sessionId,
-  });
-
-  // Create transport for this session
-  const transport = createTransport(sessionId);
-
-  // Send session ID to client (endpoint discovery for legacy clients)
-  res.write(`event: endpoint\n`);
-  res.write(`data: /mcp?sessionId=${sessionId}\n\n`);
-
-  // Handle transport messages
-  transport.on("message", (message) => {
-    res.write(`event: message\n`);
-    res.write(`data: ${JSON.stringify(message)}\n\n`);
-  });
-
-  // Handle client disconnect
-  req.on("close", () => {
-    console.log(`🔌 SSE connection closed for session: ${sessionId}`);
-    transport.close();
-  });
+  // Note: transport.onclose is set in createTransport() for cleanup
 });
 
 // Message endpoint - Receives messages from ChatGPT
@@ -151,7 +125,7 @@ app.post("/mcp/message", async (req, res) => {
 
   try {
     // Send message to transport
-    await transport.handlePostMessage(req.body, res);
+    await transport.handlePostMessage(req, res, req.body);
   } catch (error) {
     console.error("Error handling message:", error);
     res.status(500).json({

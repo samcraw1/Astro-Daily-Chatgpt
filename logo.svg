@@ -1,0 +1,43 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#gradient1)"/>
+
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4C1D95;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#5B21B6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D28D9;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FCD34D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F59E0B;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Crescent Moon -->
+  <path d="M 280 120 A 80 80 0 1 1 280 392 A 60 60 0 1 0 280 120 Z" fill="url(#goldGradient)"/>
+
+  <!-- Stars -->
+  <circle cx="180" cy="180" r="8" fill="#FBBF24"/>
+  <circle cx="360" cy="200" r="6" fill="#FBBF24"/>
+  <circle cx="340" cy="320" r="7" fill="#FBBF24"/>
+  <circle cx="160" cy="340" r="5" fill="#FBBF24"/>
+  <circle cx="200" cy="280" r="4" fill="#FDE68A"/>
+  <circle cx="320" cy="260" r="5" fill="#FDE68A"/>
+
+  <!-- Sparkle Stars -->
+  <path d="M 380 160 L 384 172 L 396 176 L 384 180 L 380 192 L 376 180 L 364 176 L 376 172 Z" fill="#FEF3C7"/>
+  <path d="M 140 240 L 143 249 L 152 252 L 143 255 L 140 264 L 137 255 L 128 252 L 137 249 Z" fill="#FEF3C7"/>
+
+  <!-- Zodiac Circle (subtle) -->
+  <circle cx="256" cy="256" r="140" stroke="#A78BFA" stroke-width="2" fill="none" opacity="0.3"/>
+  <circle cx="256" cy="256" r="145" stroke="#DDD6FE" stroke-width="1" fill="none" opacity="0.2"/>
+
+  <!-- Small constellation dots -->
+  <circle cx="256" cy="140" r="3" fill="#E9D5FF"/>
+  <circle cx="140" cy="256" r="3" fill="#E9D5FF"/>
+  <circle cx="372" cy="256" r="3" fill="#E9D5FF"/>
+  <circle cx="256" cy="372" r="3" fill="#E9D5FF"/>
+</svg>

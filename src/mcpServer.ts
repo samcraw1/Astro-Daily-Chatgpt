@@ -524,17 +524,22 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Transport management
 export const transports = new Map<string, SSEServerTransport>();
 
-export function createTransport(sessionId: string): SSEServerTransport {
-  const transport = new SSEServerTransport("/mcp", {
-    sessionId,
-  });
+export async function createTransport(res: any): Promise<SSEServerTransport> {
+  const transport = new SSEServerTransport("/mcp/message", res);
 
-  transports.set(sessionId, transport);
+  // Connect transport to server (this calls start() automatically)
+  await mcpServer.connect(transport);
 
-  // Connect transport to server
-  mcpServer.connect(transport);
+  // Store using the transport's own sessionId
+  transports.set(transport.sessionId, transport);
 
-  console.log(`✅ MCP transport created for session: ${sessionId}`);
+  // Handle transport cleanup
+  transport.onclose = () => {
+    console.log(`🧹 Cleaning up transport for session: ${transport.sessionId}`);
+    transports.delete(transport.sessionId);
+  };
+
+  console.log(`✅ MCP transport created for session: ${transport.sessionId}`);
 
   return transport;
 }
