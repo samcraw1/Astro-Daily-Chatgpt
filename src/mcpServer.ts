@@ -6,13 +6,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import OpenAI from "openai";
-import { createCanvas, registerFont } from "canvas";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Lazy OpenAI client initialization (after env vars are loaded)
 let openai: OpenAI | null = null;
@@ -182,51 +175,6 @@ const dailyVibes = [
   "Grounded & Stable",
 ];
 
-const symbolFontFamily = (() => {
-  const candidateFonts = [
-    { path: "/System/Library/Fonts/Apple Symbols.ttf", family: "AppleSymbols" },
-    { path: "/System/Library/Fonts/Supplemental/NotoSansSymbols2-Regular.otf", family: "NotoSansSymbols2" },
-    { path: "/System/Library/Fonts/Supplemental/Symbola.ttc", family: "Symbola" },
-    { path: "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf", family: "NotoSansSymbols2" },
-    { path: "/usr/share/fonts/truetype/ancient-scripts/Symbola.ttf", family: "Symbola" },
-  ];
-
-  for (const { path: fontPath, family } of candidateFonts) {
-    if (fs.existsSync(fontPath)) {
-      try {
-        registerFont(fontPath, { family });
-        console.log(`🆙 Registered zodiac symbol font: ${family}`);
-        return family;
-      } catch (error) {
-        console.warn(`⚠️ Could not register font "${family}" at ${fontPath}:`, error);
-      }
-    }
-  }
-
-  console.warn("⚠️ No dedicated zodiac symbol font found. Falling back to sans-serif.");
-  return "sans-serif";
-})();
-
-function getPaletteForSign(zodiacSign: ZodiacSign, style: StyleOption): Palette {
-  const element = zodiacElementMap[zodiacSign];
-  const elementTheme = elementColorThemes[element];
-  const basePalette = { ...stylePalettes[style] };
-
-  if (style === "gradient") {
-    basePalette.background = elementTheme.gradientBackground;
-    basePalette.secondary = elementTheme.gradientSecondary;
-    if (elementTheme.gradientPrimary) {
-      basePalette.primary = elementTheme.gradientPrimary;
-    } else {
-      basePalette.primary = "#FFFFFF";
-    }
-  }
-
-  basePalette.accent = elementTheme.accent;
-
-  return basePalette;
-}
-
 function getLuckyColorForSign(zodiacSign: ZodiacSign): string {
   const element = zodiacElementMap[zodiacSign];
   const options = elementLuckyColors[element];
@@ -235,6 +183,73 @@ function getLuckyColorForSign(zodiacSign: ZodiacSign): string {
 
 function getDailyVibe(): string {
   return dailyVibes[Math.floor(Math.random() * dailyVibes.length)];
+}
+
+function getBackgroundDescription(style: StyleOption, element: Element): string {
+  const elementScenes = {
+    fire: "warm sunset oranges and reds",
+    earth: "forest greens and earth tones",
+    air: "ethereal blues and purples",
+    water: "deep ocean blues and indigos"
+  };
+
+  const baseScene = elementScenes[element];
+
+  switch (style) {
+    case "mystical":
+      return `Dramatic cosmic scene with ${baseScene}, silhouette of person gazing at stars, constellation patterns, magical glow`;
+    case "gradient":
+      return `Smooth modern gradient in ${baseScene}, vibrant, ethereal, contemporary`;
+    case "minimalist":
+      return `Clean minimalist ${baseScene}, subtle texture, elegant, sophisticated`;
+    default:
+      return baseScene;
+  }
+}
+
+function buildDALLEPrompt(
+  zodiacSign: ZodiacSign,
+  style: StyleOption,
+  horoscopeText: string,
+  luckyNumber: number,
+  luckyColor: string,
+  dailyVibe: string,
+  date: string
+): string {
+  const element = zodiacElementMap[zodiacSign];
+  const zodiacSymbol = zodiacSymbolMap[zodiacSign];
+  const backgroundDescription = getBackgroundDescription(style, element);
+
+  return `Create a professional Instagram story graphic (9:16 vertical format, 1080x1920px):
+
+BACKGROUND:
+${backgroundDescription}
+
+TEXT ELEMENTS (all must be clearly readable):
+
+1. TOP: Large elegant gold script text "${zodiacSign.toUpperCase()}"
+   Below: italic white serif "Today's Horoscope"
+   Below: small gray "${date}"
+   Include ${zodiacSign} constellation symbol (${zodiacSymbol}) glowing subtly
+
+2. CENTER: White sans-serif font, center-aligned:
+   "${horoscopeText}"
+   (with text shadow for readability)
+
+3. BOTTOM:
+   Left: "LUCKY NUMBER" in gold, "${luckyNumber}" in large white
+   Right: "LUCKY COLOR" in gold, "${luckyColor}" in white
+   Center: "TODAY'S VIBE" in gold, "${dailyVibe}" in white
+
+4. FOOTER: "✨ Astro Daily ✨" in small silver
+
+TYPOGRAPHY:
+- Title: Elegant script (Great Vibes/Edwardian Script style)
+- Body: Clean sans-serif (Helvetica/Inter style)
+- Gold: #FFD700
+- All text crisp with shadows/outlines for readability
+
+AESTHETIC: Instagram story, professional, cinematic, inspirational`;
 }
 
 // Create MCP Server
@@ -258,211 +273,90 @@ const GenerateHoroscopeArgsSchema = z.object({
 
 // Tool implementation function
 async function generateDailyHoroscope(zodiac_sign: ZodiacSign, style: StyleOption = "minimalist") {
-    try {
-      console.log(`Generating horoscope for ${zodiac_sign} in ${style} style...`);
+  try {
+    console.log(`Generating horoscope for ${zodiac_sign} in ${style} style...`);
 
-      // 1. Generate horoscope text with OpenAI
-      const completion = await getOpenAI().chat.completions.create({
-        model: "gpt-4-turbo-preview",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a creative astrologer. Generate a inspiring, positive daily horoscope in 2-4 sentences. Be specific and uplifting.",
-          },
-          {
-            role: "user",
-            content: `Generate a daily horoscope for ${zodiac_sign}. Make it inspiring and specific to today.`,
-          },
-        ],
-        temperature: 0.9,
-        max_tokens: 150,
-      });
+    // Generate horoscope text with GPT-4
+    const completion = await getOpenAI().chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        {
+          role: "system",
+          content: "You are a creative astrologer. Generate an inspiring, positive daily horoscope in 2-4 sentences. Be specific and uplifting. Keep it concise for Instagram.",
+        },
+        {
+          role: "user",
+          content: `Generate a daily horoscope for ${zodiac_sign}. Make it inspiring and specific to today.`,
+        },
+      ],
+      temperature: 0.9,
+      max_tokens: 150,
+    });
 
-      const horoscopeText = completion.choices[0].message.content || "Your stars shine bright today!";
+    const horoscopeText = completion.choices[0].message.content || "Your stars shine bright today!";
+    const luckyNumber = Math.floor(Math.random() * 99) + 1;
+    const luckyColor = getLuckyColorForSign(zodiac_sign);
+    const dailyVibe = getDailyVibe();
+    const today = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
-      // 2. Generate lucky number (1-99)
-      const luckyNumber = Math.floor(Math.random() * 99) + 1;
+    // Build DALL-E prompt
+    const dallePrompt = buildDALLEPrompt(
+      zodiac_sign,
+      style,
+      horoscopeText,
+      luckyNumber,
+      luckyColor,
+      dailyVibe,
+      today
+    );
 
-      // 3. Generate lucky color
-      const luckyColor = getLuckyColorForSign(zodiac_sign);
+    // Call DALL-E to generate image
+    const dalleResponse = await getOpenAI().images.generate({
+      model: "dall-e-3",
+      prompt: dallePrompt,
+      n: 1,
+      size: "1024x1792",
+      quality: "hd", // HD for better text rendering
+    });
 
-      // 4. Generate daily vibe
-      const dailyVibe = getDailyVibe();
+    const imageUrl = dalleResponse.data[0].url;
 
-      // 5. Create 1080x1920 PNG graphic with Canvas
-      const canvas = createCanvas(1080, 1920);
-      const ctx = canvas.getContext("2d");
+    console.log(`✨ Horoscope generated for ${zodiac_sign}`);
 
-      // Get color palette
-      const palette = getPaletteForSign(zodiac_sign, style);
+    // Return with image URL for ChatGPT to display
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Here's your ${zodiac_sign.toUpperCase()} horoscope for ${today}!
 
-      // Draw background
-      if (style === "gradient" && Array.isArray(palette.background)) {
-        const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-        gradient.addColorStop(0, palette.background[0]);
-        gradient.addColorStop(1, palette.background[1]);
-        ctx.fillStyle = gradient;
-      } else {
-        ctx.fillStyle = palette.background as string;
-      }
-      ctx.fillRect(0, 0, 1080, 1920);
+**Horoscope:** ${horoscopeText}
 
-      // Add decorative elements based on style
-      if (style === "mystical") {
-        // Add stars
-        ctx.fillStyle = palette.accent;
-        for (let i = 0; i < 50; i++) {
-          const x = Math.random() * 1080;
-          const y = Math.random() * 1920;
-          const radius = Math.random() * 2 + 1;
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
+**Lucky Number:** ${luckyNumber}
+**Lucky Color:** ${luckyColor}
+**Today's Vibe:** ${dailyVibe}
 
-      // Title: Zodiac Sign
-      ctx.fillStyle = palette.primary;
-      ctx.font = "bold 90px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(zodiac_sign.toUpperCase(), 540, 170);
-
-      // Zodiac Symbol
-      const zodiacSymbol = zodiacSymbolMap[zodiac_sign];
-      if (zodiacSymbol) {
-        ctx.fillStyle = palette.accent;
-        ctx.font = `160px ${symbolFontFamily}`;
-        ctx.fillText(zodiacSymbol, 540, 330);
-      }
-
-      // Subtitle: Today's Horoscope
-      ctx.fillStyle = palette.secondary;
-      ctx.font = "32px sans-serif";
-      ctx.fillText("Today's Horoscope", 540, 420);
-
-      // Date
-      const today = new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      ctx.font = "24px sans-serif";
-      ctx.fillText(today, 540, 470);
-
-      // Horoscope text (wrapped)
-      ctx.fillStyle = palette.primary;
-      ctx.font = "36px sans-serif";
-      ctx.textAlign = "center";
-      const words = horoscopeText.split(" ");
-      let line = "";
-      let y = 620;
-      const maxWidth = 900;
-
-      for (let i = 0; i < words.length; i++) {
-        const testLine = line + words[i] + " ";
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && i > 0) {
-          ctx.fillText(line, 540, y);
-          line = words[i] + " ";
-          y += 50;
-        } else {
-          line = testLine;
-        }
-      }
-      ctx.fillText(line, 540, y);
-
-      // Info boxes
-      const boxY = 1240;
-      const boxSpacing = 200;
-
-      // Lucky Number
-      ctx.fillStyle = palette.accent;
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText("LUCKY NUMBER", 540, boxY);
-      ctx.fillStyle = palette.primary;
-      ctx.font = "bold 72px sans-serif";
-      ctx.fillText(luckyNumber.toString(), 540, boxY + 80);
-
-      // Lucky Color
-      ctx.fillStyle = palette.accent;
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText("LUCKY COLOR", 540, boxY + boxSpacing);
-      ctx.fillStyle = palette.primary;
-      ctx.font = "36px sans-serif";
-      ctx.fillText(luckyColor, 540, boxY + boxSpacing + 60);
-
-      // Daily Vibe
-      ctx.fillStyle = palette.accent;
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText("TODAY'S VIBE", 540, boxY + boxSpacing * 2);
-      ctx.fillStyle = palette.primary;
-      ctx.font = "36px sans-serif";
-      ctx.fillText(dailyVibe, 540, boxY + boxSpacing * 2 + 60);
-
-      // Footer
-      ctx.fillStyle = palette.secondary;
-      ctx.font = "24px sans-serif";
-      ctx.fillText("✨ Astro Daily ✨", 540, 1850);
-
-      // 6. Save to /output folder
-      const outputDir = path.join(process.cwd(), "output");
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      const timestamp = Date.now();
-      const filename = `${zodiac_sign}_${style}_${timestamp}.png`;
-      const filepath = path.join(outputDir, filename);
-
-      const buffer = canvas.toBuffer("image/png");
-      fs.writeFileSync(filepath, buffer);
-
-      // 7. Return image URL and base64 data to ChatGPT
-      const base64Image = buffer.toString("base64");
-      const imageUrl = `file://${filepath}`;
-
-      console.log(`✨ Horoscope generated: ${filepath}`);
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              zodiac_sign,
-              style,
-              horoscope_text: horoscopeText,
-              lucky_number: luckyNumber,
-              lucky_color: luckyColor,
-              daily_vibe: dailyVibe,
-              image_path: filepath,
-              image_url: imageUrl,
-            }, null, 2),
-          },
-          {
-            type: "image",
-            data: base64Image,
-            mimeType: "image/png",
-          },
-        ],
-      };
-    } catch (error) {
-      console.error("Error generating horoscope:", error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
+Your Instagram-style horoscope graphic: ${imageUrl}`,
+        },
+      ],
+    };
+  } catch (error) {
+    console.error("Error generating horoscope:", error);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        },
+      ],
+      isError: true,
+    };
+  }
 }
 
 // Register tools/list handler
